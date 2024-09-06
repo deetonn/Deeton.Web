@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using Deeton.Web.Endpoints;
+using System.Net;
 
 namespace Deeton.Web;
 
@@ -40,6 +41,9 @@ public class WebApplication : IDisposable
         _404Handler = Default404Handler;
         Subsystem = new WebSubsystem(this);
     }
+
+    public HttpPathHandler CreatePathHandler(string path)
+        => new(path, this);
 
     /// <summary>
     /// Begin waiting for incoming requests. This function merely stops the main thread

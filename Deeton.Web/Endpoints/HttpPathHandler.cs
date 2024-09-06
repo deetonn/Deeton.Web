@@ -27,6 +27,13 @@ public class HttpSpecificPathHandler
         Subpath = subPath;
     }
 
+    public HttpSpecificPathHandler(IHttpPath path)
+    {
+        ContentTypeGetter = path.GetContentType;
+        ContentGetter = path.GetContent;
+        Subpath = path.SubPath;
+    }
+
     public HttpSpecificPathHandler WithContentTypeGetter(Func<HttpRequestData, ContentType> contentTypeGetter)
     {
         ContentTypeGetter = contentTypeGetter;
@@ -60,11 +67,34 @@ public class HttpPathHandler : IHttpEndpoint
         application.Subsystem.AddEndpoint(basePath, this);
     }
 
+    /// <summary>
+    /// Make this <see cref="HttpSpecificPathHandler"/> listen on the sub-path supplied.
+    /// The sub-path is the section that comes after the base of the URL. If this endpoint is on
+    /// "/api/v1", with a sub-path of "version", it would listen on "/api/v1/version"
+    /// </summary>
+    /// <param name="subPath">The sub path relative to the base path supplied.</param>
+    /// <returns>Self, to allow chaining.</returns>
     public HttpSpecificPathHandler WithSubPath(string subPath)
     {
         var newPathHandler = new HttpSpecificPathHandler(subPath);
         _handlers.Add(subPath, newPathHandler);
         return newPathHandler;
+    }
+
+    /// <summary>
+    /// Use a custom <see cref="IHttpPath"/>. This will case <see cref="WithSubPath(string)"/> with
+    /// <see cref="IHttpPath.SubPath"/>.
+    /// </summary>
+    /// <inheritdoc cref="WithSubPath(string)"/>
+    /// <typeparam name="T"></typeparam>
+    /// <returns>Self, to allow chaining.</returns>
+    public HttpPathHandler WithSubPath<T>() where T: IHttpPath, new()
+    {
+        var inst = new T();
+        WithSubPath(inst.SubPath)
+            .WithContentTypeGetter(inst.GetContentType)
+            .WithContentGetter(inst.GetContent);
+        return this;
     }
 
     public ContentType GetContentType(HttpRequestData data)
@@ -90,4 +120,7 @@ public class HttpPathHandler : IHttpEndpoint
         // Automatically attempt to redirect to /404
         return notFoundHandler(data).Item2;
     }
+
+    internal Dictionary<string, HttpSpecificPathHandler> GetSubhandlers()
+        => _handlers;
 }

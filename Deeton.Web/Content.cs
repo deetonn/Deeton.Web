@@ -1,4 +1,5 @@
 ﻿
+using Newtonsoft.Json;
 using System.Text;
 
 namespace Deeton.Web;
@@ -8,7 +9,7 @@ namespace Deeton.Web;
 /// </summary>
 public class Content
 {
-    private StringBuilder ContentBytes;
+    protected StringBuilder ContentBytes;
 
     public Content()
     {
@@ -20,7 +21,7 @@ public class Content
     /// </summary>
     /// <param name="encoding">The encoding of the bytes. This is defaulted to <see cref="Encoding.UTF8"/></param>
     /// <returns>The array of bytes, encoded as <paramref name="encoding"/></returns>
-    public byte[] GetBytes(Encoding? encoding = null)
+    public virtual byte[] GetBytes(Encoding? encoding = null)
     {
         encoding ??= Encoding.UTF8;
         return encoding.GetBytes(ContentBytes.ToString());
@@ -47,6 +48,21 @@ public class Content
         var content = new Content
         {
             ContentBytes = new StringBuilder(text)
+        };
+        return content;
+    }
+
+    /// <summary>
+    /// Serialize an object and turn the text JSON into a <see cref="Content"/> instance.
+    /// </summary>
+    /// <param name="obj"></param>
+    /// <returns></returns>
+    public static Content FromObjectIntoJson(object? obj)
+    {
+        var jsonContent = JsonConvert.SerializeObject(obj);
+        var content = new Content
+        {
+            ContentBytes = new StringBuilder(jsonContent)
         };
         return content;
     }

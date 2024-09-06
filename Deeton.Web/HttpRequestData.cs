@@ -1,6 +1,9 @@
 
 namespace Deeton.Web;
 
+/// <summary>
+/// The request data associated with a HTTP request.
+/// </summary>
 public class HttpRequestData
 {
     /// <summary>

@@ -8,6 +8,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Examples\BasicWebServer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Examples\BasicWebServer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" Version="0.49.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Deeton.Web\Deeton.Web.csproj" />
   </ItemGroup>
 

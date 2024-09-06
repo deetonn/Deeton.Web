@@ -6,6 +6,11 @@ namespace Deeton.Web;
 /// </summary>
 public record ContentType
 {
+    /// <summary>
+    /// Automatically creates a valid "Content-Type: XXX" string from the types using 
+    /// reflection.
+    /// </summary>
+    /// <returns></returns>
     public string AsHttpString()
     {
         var baseName = GetType().BaseType!.Name.ToLower();

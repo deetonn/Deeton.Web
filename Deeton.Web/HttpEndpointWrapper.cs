@@ -2,6 +2,11 @@
 
 namespace Deeton.Web;
 
+/// <summary>
+/// This class is the wrapper for a HTTP listener. It takes all supplied information and actually
+/// listens and waits for a specific HTTP path and calls relevant functions such as <see cref="IHttpEndpoint.Get(Deeton.Web.HttpRequestData)"/>
+/// and <see cref="IHttpEndpoint.Set(Deeton.Web.HttpRequestData)"/>
+/// </summary>
 public class HttpEndpointWrapper : IDisposable
 {
     /// <summary>
@@ -31,8 +36,13 @@ public class HttpEndpointWrapper : IDisposable
     /// <param name="httpEndpoint"></param>
     public HttpEndpointWrapper(MappedEndpointText endpoint, IHttpEndpoint httpEndpoint)
     {
+        using var timer = DebugLogging.Timed($"Initializing HTTP endpoint for [yellow]{endpoint.RelativeEndpointUrl}[/]");
+
         Listener = new HttpListener();
         Listener.Prefixes.Add(endpoint.AbsoluteEndpointUrl);
+
+        // Must call this before we queue the thread job.
+        Listener.Start();
 
         ThreadPool.QueueUserWorkItem(async _ =>
         {
@@ -45,14 +55,13 @@ public class HttpEndpointWrapper : IDisposable
             }
             catch (Exception e)
             {
-                Console.Error.WriteLine($"The HTTP listener for {endpoint.AbsoluteEndpointUrl} threw an exception.");
-                Console.Error.WriteLine($" ^ {e.Message}");
+                DebugLogging.LogError($"The HTTP listening thread threw an exception. (for [yellow]{endpoint.AbsoluteEndpointUrl}[/]");
+                DebugLogging.LogError($"Further information on the error above: {e.Message}");
             }
         });
 
         Endpoint = endpoint;
         HttpEndpoint = httpEndpoint;
-        Listener.Start();
     }
 
     private async Task CoreThreadFunction()
@@ -68,10 +77,12 @@ public class HttpEndpointWrapper : IDisposable
             }
             catch (Exception e)
             {
-                Console.WriteLine("An invalid URL is being used for a HTTP endpoint.");
-                Console.WriteLine($"Message: {e}");
+                DebugLogging.LogError($"Failed to parse URL during a GET request for [yellow]{Endpoint.RelativeEndpointUrl}[/]");
+                DebugLogging.LogError($"Further information regarding the previous error: {e}");
                 return;
             }
+            using var getTimer = DebugLogging.Timed($"Serving a GET request for [yellow]{rawUrl.Text}[/]");
+
             var headers = new HttpHeaders(context!.Request.Headers);
             headers.JoinWith(rawUrl.Arguments);
 
@@ -92,7 +103,7 @@ public class HttpEndpointWrapper : IDisposable
             await context.Response.OutputStream.WriteAsync(bytes);
             context.Response.OutputStream.Close();
 
-            Console.WriteLine($"GET {rawUrl.Text}");
+            // DebugLogging.LogInfo($"HTTP/GET -> {rawUrl.Text} (Responded with {bytes.LongLength} bytes)");
 
             return;
         }

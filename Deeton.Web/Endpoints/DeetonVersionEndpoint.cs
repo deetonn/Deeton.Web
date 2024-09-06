@@ -1,9 +1,10 @@
 ﻿using Deeton.Web;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Deeton.Web.Endpoints;
 
-public class DeetonVersion
+internal class DeetonVersion
 {
     public required int Major { get; init; }
 
@@ -15,35 +16,95 @@ public class DeetonVersion
 /// 
 /// This is only loaded in debug mode by default.
 /// </summary>
-public class DeetonSubEndpoint : IHttpEndpoint
+internal class DeetonSubEndpoint
 {
-    private Dictionary<string, Func<HttpRequestData, Content>> _subHandlers;
+    private static WebApplication? _app;
 
-    public DeetonSubEndpoint()
+    public static HttpPathHandler Load(WebApplication application)
     {
-        _subHandlers = [];
-        _subHandlers.Add("/version", (data) =>
-        {
-            return Content.FromText(JsonConvert.SerializeObject(new DeetonVersion()
-            {
-                Major = 0,
-                Minor = 1
-            }));
-        });
+        _app ??= application;
+        var handler = new HttpPathHandler("/_deeton", application);
+
+        handler
+            .WithSubPath("/version")
+            .WithContentTypeGetter((_) => Application.Json)
+            .WithContentGetter((_) => Content.FromText(
+                JsonConvert.SerializeObject(
+                    new DeetonVersion { Major = 0, Minor = 1 }
+                    )
+                )
+            );
+
+        handler
+            .WithSubPath("/endpoints")
+            .WithContentTypeGetter((_) => Application.Json)
+            .WithContentGetter(GetEndpoints);
+
+        return handler;
     }
 
-    public ContentType GetContentType(HttpRequestData data)
+    private static Content GetEndpoints(HttpRequestData data)
     {
-        return Application.Json;
-    }
+        var listeners = _app?.Subsystem._listeners;
+        List<EndpointData> endpoints = [];
 
-    public Content Get(HttpRequestData data)
-    {
-        if (_subHandlers.TryGetValue(data.Subpath ?? string.Empty, out var func))
+        if (listeners is null)
         {
-            return func(data);
+            // Empty JSON object. There are no endpoints currently.
+            return Content.FromObjectIntoJson(
+                new EndpointDataResult { Data = endpoints }
+            );
         }
 
-        return Content.FromText("404 - Not Found!");
+        foreach (var (path, listener) in listeners)
+        {
+            if (listener.HttpEndpoint is HttpPathHandler ph)
+            {
+                var sh = ph.GetSubhandlers();
+                foreach (var (subpath, subhandler) in sh)
+                {
+                    endpoints.Add(new EndpointData()
+                    {
+                        Path = path + subpath,
+                        ContentType = subhandler.ContentTypeGetter(
+                            new HttpRequestData
+                            {
+                                Headers = new(new Dictionary<string, string>()),
+                                Subpath = subpath
+                            }
+                        ).AsHttpString()
+                    });
+                }
+            }
+            else
+            {
+                endpoints.Add(new EndpointData
+                {
+                    Path = path,
+                    ContentType = listener.HttpEndpoint.GetContentType(new HttpRequestData
+                    {
+                        Headers = new(new Dictionary<string, string>()),
+                        Subpath = path
+                    }).AsHttpString()
+                });
+            }
+        }
+
+        return Content.FromObjectIntoJson(new EndpointDataResult { Data = endpoints });
     }
+}
+
+internal class EndpointData
+{
+    [JsonProperty(PropertyName = "path")]
+    public string? Path { get; set; }
+
+    [JsonProperty(PropertyName = "contentType")]
+    public string? ContentType { get; set; }
+}
+
+internal class EndpointDataResult
+{
+    [JsonProperty(PropertyName = "data")]
+    public List<EndpointData>? Data { get; set; }
 }

@@ -10,17 +10,18 @@ public class WebSubsystem : IDisposable
     /// This is mapped by relative endpoint -> http listener.
     /// EG. (/api/v1/version -> WrapperImpl())
     /// </summary>
-    private readonly Dictionary<string, HttpEndpointWrapper> _listeners = [];
+    internal readonly Dictionary<string, HttpEndpointWrapper> _listeners = [];
 
+    /// <summary>
+    /// The parent web application.
+    /// </summary>
     private readonly WebApplication _application;
 
     public WebSubsystem(WebApplication application)
     {
-        _application = application;
+        using var timer = DebugLogging.Timed("Initialization of the WebSubsystem");
 
-#if DEBUG
-        AddEndpoint("/_deeton", new DeetonSubEndpoint());
-#endif
+        _application = application;
     }
 
     /// <summary>
@@ -51,9 +52,20 @@ public class WebSubsystem : IDisposable
         return wrapper.HttpEndpoint;
     }
 
+    /// <summary>
+    /// Loads the "_deeton" endpoint that provides version info etc.
+    /// 
+    /// So far, this provides "/_deeton/version" and "/_deeton/endpoints".
+    /// </summary>
+    public void LoadBuiltinEndpoint()
+    {
+        DeetonSubEndpoint.Load(_application);
+    }
+
     public void Dispose()
     {
         GC.SuppressFinalize(this);
+        using var timer = DebugLogging.Timed("WebSubsystem shutdown");
 
         foreach (var (_, value) in _listeners)
         {
